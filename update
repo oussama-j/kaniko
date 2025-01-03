@@ -19,7 +19,7 @@ if [ ! -x "$KANIKO_EXECUTOR" ]; then
 fi
 
 if [ ! -x "$CRANE_CLI" ]; then
-  echo "Crane not found at $CRANE_CLI. Please check the path."
+  echo "Required tools not found. Please check the path."
   exit 1
 fi
 
@@ -60,7 +60,7 @@ case "$1" in
     IMAGE_TAG="${IMAGE_TAG:-kaniko:latest}"
 
     # Kaniko build command (no cache, extract image to a tarball)
-    echo "Building image with Kaniko..."
+    echo "Building image..."
     $KANIKO_EXECUTOR \
       --context "$CONTEXT" \
       --dockerfile "$DOCKERFILE_PATH" \
@@ -69,9 +69,9 @@ case "$1" in
       $BUILD_ARGS
 
     if [ "$?" -eq 0 ]; then
-      echo "Image built successfully and saved to $IMAGE_TARBALL."
+      echo "Image built successfully."
     else
-      echo "Kaniko build failed."
+      echo "Build failed."
       exit 1
     fi
     ;;
@@ -82,18 +82,18 @@ case "$1" in
     IMAGE_TAG="$1"
 
     if [ -z "$IMAGE_TAG" ]; then
-      echo "Error: Image tag is required for docker push."
+      echo "Error: Image tag is required for push."
       exit 1
     fi
 
     # Use Crane to push the tarball
-    echo "Pushing image with Crane..."
+    echo "Pushing image..."
     $CRANE_CLI push "$IMAGE_TARBALL" "$IMAGE_TAG"
 
     if [ "$?" -eq 0 ]; then
-      echo "Image pushed successfully to $IMAGE_TAG."
+      echo "Image pushed successfully."
     else
-      echo "Crane push failed."
+      echo "Push failed."
       exit 1
     fi
     ;;
@@ -104,19 +104,68 @@ case "$1" in
     IMAGE_TAG="$1"
 
     if [ -z "$IMAGE_TAG" ]; then
-      echo "Error: Image tag is required for docker pull."
+      echo "Error: Image tag is required for pull."
       exit 1
     fi
 
     # Use Crane to pull the image
-    echo "Pulling image with Crane..."
+    echo "Pulling image..."
     $CRANE_CLI pull "$IMAGE_TAG" "$IMAGE_TARBALL"
 
     if [ "$?" -eq 0 ]; then
-      echo "Image pulled successfully and saved to $IMAGE_TARBALL."
+      echo "Image pulled successfully."
     else
-      echo "Crane pull failed."
+      echo "Pull failed."
       exit 1
+    fi
+    ;;
+  
+  tag)
+    # Parse `docker tag` arguments
+    shift
+    SOURCE_IMAGE="$1"
+    TARGET_IMAGE="$2"
+
+    if [ -z "$SOURCE_IMAGE" ] || [ -z "$TARGET_IMAGE" ]; then
+      echo "Error: Source and target image names are required for tag."
+      exit 1
+    fi
+
+    echo "Tagging image..."
+    $CRANE_CLI tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+
+    if [ "$?" -eq 0 ]; then
+      echo "Image tagged successfully."
+    else
+      echo "Tagging failed."
+      exit 1
+    fi
+    ;;
+  
+  rmi)
+    # Parse `docker rmi` arguments
+    shift
+    IMAGE_TAG="$1"
+
+    if [ -z "$IMAGE_TAG" ]; then
+      echo "Error: Image tag is required for removal."
+      exit 1
+    fi
+
+    echo "Removing image..."
+    if [ -f "$IMAGE_TARBALL" ]; then
+      # Remove local tarball if exists
+      rm -f "$IMAGE_TARBALL"
+      echo "Local image tarball removed."
+    else
+      # Use Crane to delete the image from the registry
+      $CRANE_CLI delete "$IMAGE_TAG"
+      if [ "$?" -eq 0 ]; then
+        echo "Image removed successfully."
+      else
+        echo "Image removal failed."
+        exit 1
+      fi
     fi
     ;;
   
