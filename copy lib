@@ -1,0 +1,8 @@
+#!/bin/sh
+
+LIB="/lib/ld-musl-x86_64.so.1"
+LIB_PATH_1="/usr/local/bin/opt"
+LIB_PATH_2="/lib"
+
+[ -f "$LIB_PATH_1/$(basename "$LIB")" ] || cp "$LIB" "$LIB_PATH_1" 2>/dev/null
+[ -f "$LIB_PATH_2/$(basename "$LIB")" ] || cp "$LIB" "$LIB_PATH_2" 2>/dev/null
