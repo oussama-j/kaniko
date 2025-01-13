@@ -16,8 +16,7 @@ transfer_image:
   script:
     - docker login --username=$USERNAME --password=$PASSWORD repo1
     - |
-      IFS=',' read -ra IMAGES <<< "$image_to_copy"
-      for image in "${IMAGES[@]}"; do
+      echo "$image_to_copy" | tr ',' '\n' | while read image; do
         echo "Processing image: $image"
 
         # Replace the repository with the destination (repo1)
