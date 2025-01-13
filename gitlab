@@ -1,0 +1,43 @@
+image: repo1/maven:3.9.6-eclipse-temurin-21-alpine
+
+stages:
+  - transfer_image
+
+variables:
+  image_to_copy:
+    description: "Comma-separated list of images to transfer (e.g., repo2/image1:tag,repo2/image2:tag)"
+    value: "repo2/ci-runner4gitlab:4.9-allinone,repo2/example:latest"
+
+transfer_image:
+  stage: transfer_image
+  image: repo1/kaniko/executor:v1.23.2.13-debug-wrapper
+  tags:
+    - k8s-medium
+  script:
+    - docker login --username=$USERNAME --password=$PASSWORD repo1
+    - |
+      IFS=',' read -ra IMAGES <<< "$image_to_copy"
+      for image in "${IMAGES[@]}"; do
+        echo "Processing image: $image"
+
+        # Replace the repository with the destination (repo1)
+        new_image=$(echo "$image" | sed -E 's|^[^/]*/|repo1/|')
+        echo "New image: $new_image"
+
+        # Extract image name and tag
+        image_name=$(echo "$new_image" | awk -F: '{print $1}')
+        image_tag=$(echo "$new_image" | awk -F: '{print $2}')
+
+        # Check if the image exists in the destination registry
+        status_code=$(curl -s -o /dev/null -w "%{http_code}" -u "$ARTIFACTORY_USERNAME:$ARTIFACTORY_PASSWORD" \
+          "https://artifactory.example.com/v2/${image_name}/manifests/${image_tag}")
+
+        if [ "$status_code" -eq 200 ]; then
+          echo "Image $new_image already exists in the destination registry. Skipping pull and push."
+        else
+          echo "Image $new_image does not exist. Pulling and pushing..."
+          docker pull "$image"
+          docker tag "$image" "$new_image"
+          docker push "$new_image"
+        fi
+      done
